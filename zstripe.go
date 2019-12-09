@@ -10,27 +10,33 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"math/big"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
 )
 
 var (
-	SecretKey = ""                       // Your Stripe secret key (sk_*).
-	API       = "https://api.stripe.com" // API base URL.
-	DebugURL  = false                    // Show URLs as they're requested.
-	DebugBody = false                    // Show body of requests.
-	MaxRetry  = 30 * time.Second         // Max time to retry requests.
+	SecretKey     = ""                       // Your Stripe secret key (sk_*).
+	API           = "https://api.stripe.com" // API base URL.
+	DebugURL      = false                    // Show URLs as they're requested.
+	DebugReqBody  = false                    // Show body of request.
+	DebugRespBody = false                    // Show body of response
+	MaxRetry      = 30 * time.Second         // Max time to retry requests.
 )
 
 // ErrRetry is used when we've retried longer than MaxRetry.
 var ErrRetry = errors.New("retried longer than MaxRetry")
 
 type (
+	// ID if you're interested in just retrieving the ID from a response.
+	ID struct {
+		ID string `json:"id"`
+	}
+
 	// Error is used when the status code is not 200 OK.
 	Error struct {
 		Method, URL string
@@ -60,8 +66,24 @@ type (
 )
 
 func (e Error) Error() string {
-	return fmt.Sprintf("code %s for %s %s (%s: %s)",
-		e.Status, e.Method, e.URL, e.StripeError.Code, e.StripeError.Message)
+	sc := ""
+	if e.StripeError.Code != "" {
+		sc = e.StripeError.Code + ": "
+	}
+	return fmt.Sprintf("code %s for %s %s (%s%s)",
+		e.Status, e.Method, e.URL, sc, e.StripeError.Message)
+}
+
+// Body for requests.
+type Body map[string]string
+
+// Encode the values with url.Values.Encode().
+func (b Body) Encode() string {
+	body := make(url.Values)
+	for k, v := range b {
+		body.Set(k, v)
+	}
+	return body.Encode()
 }
 
 var client = http.Client{Timeout: 10 * time.Second}
@@ -90,7 +112,7 @@ var client = http.Client{Timeout: 10 * time.Second}
 // The Body on the returned http.Response is closed.
 //
 // This will use the global SecretKey, which must be set.
-func Request(scan interface{}, method, url string, body io.Reader) (*http.Response, error) {
+func Request(scan interface{}, method, url string, body string) (*http.Response, error) {
 	if SecretKey == "" {
 		panic("zstripe: must set SecretKey")
 	}
@@ -101,7 +123,7 @@ func Request(scan interface{}, method, url string, body io.Reader) (*http.Respon
 		url = API + url
 	}
 
-	r, err := http.NewRequest(method, url, body)
+	r, err := http.NewRequest(method, url, strings.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("zstripe: http.NewRequest: %s", err)
 	}
@@ -116,6 +138,9 @@ func Request(scan interface{}, method, url string, body io.Reader) (*http.Respon
 doreq:
 	if DebugURL {
 		fmt.Printf("%v %v\n", method, url)
+	}
+	if DebugReqBody {
+		fmt.Println(body)
 	}
 
 	resp, err := client.Do(r)
@@ -139,7 +164,7 @@ doreq:
 		return resp, fmt.Errorf("zstripe: read body: %s", err)
 	}
 
-	if DebugBody {
+	if DebugRespBody {
 		fmt.Println(string(rbody))
 	}
 
