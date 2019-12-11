@@ -86,7 +86,8 @@ func (b Body) Encode() string {
 	return body.Encode()
 }
 
-var client = http.Client{Timeout: 10 * time.Second}
+// Client to use for all API requests.
+var Client = http.Client{Timeout: 10 * time.Second}
 
 // Request something from the Stripe API.
 //
@@ -143,7 +144,7 @@ doreq:
 		fmt.Println(body)
 	}
 
-	resp, err := client.Do(r)
+	resp, err := Client.Do(r)
 	if err != nil {
 		return resp, fmt.Errorf("zstripe: client.Do: %s", err)
 	}

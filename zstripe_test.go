@@ -76,7 +76,7 @@ func TestRequest(t *testing.T) {
 			var scan struct {
 				X string `json:"x"`
 			}
-			_, err := Request(&scan, "GET", "/", nil)
+			_, err := Request(&scan, "GET", "/", "")
 			if !errorContains(err, tt.wantErr) {
 				t.Fatalf("wrong error:\nwant: %s\ngot:  %s", tt.wantErr, err)
 			}
