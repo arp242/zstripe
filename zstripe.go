@@ -170,7 +170,9 @@ doreq:
 		fmt.Println(string(rbody))
 	}
 
-	err = json.Unmarshal(rbody, scan)
+	if scan != nil {
+		err = json.Unmarshal(rbody, scan)
+	}
 	if resp.StatusCode >= 400 {
 		serr := Error{
 			Status:     resp.Status,
