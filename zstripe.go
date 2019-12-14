@@ -21,6 +21,7 @@ import (
 
 var (
 	SecretKey     = ""                       // Your Stripe secret key (sk_*).
+	PublicKey     = ""                       // Publishable key (pk_*).
 	API           = "https://api.stripe.com" // API base URL.
 	DebugURL      = false                    // Show URLs as they're requested.
 	DebugReqBody  = false                    // Show body of request.
