@@ -1,4 +1,4 @@
-[![GoDoc](https://godoc.org/zgo.at/zstripe?status.svg)](https://godoc.org/zgo.at/zstripe)
+[![GoDoc](https://godoc.org/zgo.at/zstripe?status.svg)](https://pkg.go.dev/zgo.at/zstripe)
 [![Build Status](https://travis-ci.org/zgoat/zstripe.svg?branch=master)](https://travis-ci.org/zgoat/zstripe)
 
 zstripe is a set of utility functions for working with the Stripe API.
