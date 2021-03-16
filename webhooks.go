@@ -16,13 +16,17 @@ import (
 
 // Possible errors when validating a webhook.
 var (
-	ErrWebhookTooOld           = errors.New("webhook too old")
-	ErrWebhookInvalidHeader    = errors.New("invalid Stripe-Signature header")
-	ErrWebhookInvalidSignature = errors.New("invalid signature")
+	ErrWebhookTooOld           = errors.New("zstripe.Event.Read: webhook too old")
+	ErrWebhookInvalidHeader    = errors.New("zstripe.Event.Read: invalid Stripe-Signature header")
+	ErrWebhookInvalidSignature = errors.New("zstripe.Event.Read: invalid signature")
 )
 
 var (
-	// Stripe signing secret (whsec_*).
+	// Stripe signing secret (whsec_*). This can be set to "testing" to skip,
+	// which is not recommended outside of tests since anyone can send anything
+	// to your webhook.
+	//
+	// TODO: add a Sign() function to sign webhooks.
 	SignSecret string
 
 	// Reject signatures older than this, to prevent replay attacks.
@@ -64,36 +68,42 @@ func (e *Event) Read(r *http.Request) error {
 		panic("zstripe.Event.Read: must set zstripe.SignSecret")
 	}
 
-	ts, sigs, err := parseHeader(r.Header.Get("Stripe-Signature"))
-	if err != nil {
-		return err
-	}
-	if time.Since(ts) > MaxAge {
-		return ErrWebhookTooOld
-	}
-
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
-		return err
+		return fmt.Errorf("zstripe.Event.Read: %w", err)
 	}
 
-	mac := hmac.New(sha256.New, []byte(SignSecret))
-	mac.Write([]byte(fmt.Sprintf("%d", ts.Unix())))
-	mac.Write([]byte("."))
-	mac.Write(b)
-	sig := mac.Sum(nil)
-	found := false
-	for _, s := range sigs {
-		if hmac.Equal(sig, s) {
-			found = true
-			break
+	if SignSecret != "testing" {
+		ts, sigs, err := parseHeader(r.Header.Get("Stripe-Signature"))
+		if err != nil {
+			return fmt.Errorf("zstripe.Event.Read: %w", err)
+		}
+		if time.Since(ts) > MaxAge {
+			return ErrWebhookTooOld
+		}
+
+		mac := hmac.New(sha256.New, []byte(SignSecret))
+		mac.Write([]byte(fmt.Sprintf("%d", ts.Unix())))
+		mac.Write([]byte("."))
+		mac.Write(b)
+		sig := mac.Sum(nil)
+		found := false
+		for _, s := range sigs {
+			if hmac.Equal(sig, s) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return ErrWebhookInvalidSignature
 		}
 	}
-	if !found {
-		return ErrWebhookInvalidSignature
-	}
 
-	return json.Unmarshal(b, &e)
+	err = json.Unmarshal(b, &e)
+	if err != nil {
+		return fmt.Errorf("zstripe.Event.Read: %w", err)
+	}
+	return nil
 }
 
 // The Stripe-Signature header contains a timestamp and one or more signatures.

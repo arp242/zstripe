@@ -138,10 +138,10 @@ func Request(scan interface{}, method, url string, body string) (*http.Response,
 
 doreq:
 	if DebugURL {
-		fmt.Fprintf(os.Stderr, "%v %v\n", method, url)
+		fmt.Fprintf(os.Stderr, "zstripe: %v %v\n", method, url)
 	}
 	if DebugReqBody {
-		fmt.Fprintln(os.Stderr, body)
+		fmt.Fprintln(os.Stderr, "zstripe: request: "+body)
 	}
 
 	resp, err := Client.Do(r)
@@ -166,27 +166,28 @@ doreq:
 	}
 
 	if DebugRespBody {
-		fmt.Fprintln(os.Stderr, string(rbody))
+		fmt.Fprintln(os.Stderr, "zstripe: response: "+string(rbody))
 	}
 
-	if scan != nil {
-		err = json.Unmarshal(rbody, scan)
-	}
 	if resp.StatusCode >= 400 {
-		serr := Error{
+		err := Error{
 			Status:     resp.Status,
 			StatusCode: resp.StatusCode,
 			Method:     method,
 			URL:        url,
 		}
-		_ = json.Unmarshal(rbody, &serr)
-
-		// Intentionally override the JSON status error; chances are this is the
-		// root cause.
-		err = serr
+		_ = json.Unmarshal(rbody, &err)
+		return resp, err
 	}
 
-	return resp, err
+	if scan != nil {
+		err = json.Unmarshal(rbody, scan)
+		if err != nil {
+			return resp, fmt.Errorf("zstripe.Request: scanning in to %T: %w", scan, err)
+		}
+	}
+
+	return resp, nil
 }
 
 var max = big.NewInt(0).SetUint64(18446744073709551615)
