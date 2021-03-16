@@ -1,5 +1,4 @@
-// Package zstripe is a set of utility functions for working with the Stripe
-// API.
+// Package zstripe is a set of utility functions for working with the Stripe API.
 //
 // It's not a full "client library"; but just a few functions that make it easy
 // to call api.stripe.com.
@@ -14,6 +13,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -22,6 +22,7 @@ import (
 var (
 	SecretKey     = ""                       // Your Stripe secret key (sk_*).
 	PublicKey     = ""                       // Publishable key (pk_*).
+	StripeVersion = ""                       // Stripe version to use; e.g. "2020-08-27"
 	API           = "https://api.stripe.com" // API base URL.
 	DebugURL      = false                    // Show URLs as they're requested.
 	DebugReqBody  = false                    // Show body of request.
@@ -49,15 +50,11 @@ type (
 	// StripeError is Stripe's response on errors.
 	// https://stripe.com/docs/api/errors
 	StripeError struct {
-		// Error type; always set and one of: "api_connection_error, api_error,
-		// authentication_error, card_error, idempotency_error,
-		// invalid_request_error, or rate_limit_error".
+		// Error type; always set and one of:
+		// api_connection_error, api_error, authentication_error, card_error, idempotency_error, invalid_request_error, rate_limit_error.
 		Type string `json:"type"`
 
-		// Parameter related to the error to display a message near the form
-		// field.
-		Param string `json:"param"`
-
+		Param        string `json:"param"`         // Parameter related to the error, to display a message near the form field.
 		Message      string `json:"message"`       // Human-readable message.
 		Code         string `json:"code"`          // Error code; may be blank.
 		DocURL       string `json:"doc_url"`       // URL to more information.
@@ -116,7 +113,7 @@ var Client = http.Client{Timeout: 10 * time.Second}
 // This will use the global SecretKey, which must be set.
 func Request(scan interface{}, method, url string, body string) (*http.Response, error) {
 	if SecretKey == "" {
-		panic("zstripe: must set SecretKey")
+		panic("zstripe.Request: must set zstripe.SecretKey")
 	}
 
 	start := time.Now()
@@ -134,15 +131,17 @@ func Request(scan interface{}, method, url string, body string) (*http.Response,
 	r.Header.Add("Idempotency-Key", rnd())
 	// TODO: /v1/files needs multipart/form-data
 	r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	r.Header.Add("Stripe-Version", "2019-11-05")
+	if StripeVersion != "" {
+		r.Header.Add("Stripe-Version", StripeVersion)
+	}
 	r.Header.Add("User-Agent", "Go-http-client/1.1; client=zstripe")
 
 doreq:
 	if DebugURL {
-		fmt.Printf("%v %v\n", method, url)
+		fmt.Fprintf(os.Stderr, "%v %v\n", method, url)
 	}
 	if DebugReqBody {
-		fmt.Println(body)
+		fmt.Fprintln(os.Stderr, body)
 	}
 
 	resp, err := Client.Do(r)
@@ -151,7 +150,7 @@ doreq:
 	}
 	defer resp.Body.Close()
 
-	// 202 Accepted: retry the request after a short delay.
+	// Retry the request after a short delay.
 	if resp.Header.Get("Stripe-Should-Retry") == "true" {
 		resp.Body.Close()
 		if time.Now().Sub(start) > MaxRetry {
@@ -167,7 +166,7 @@ doreq:
 	}
 
 	if DebugRespBody {
-		fmt.Println(string(rbody))
+		fmt.Fprintln(os.Stderr, string(rbody))
 	}
 
 	if scan != nil {

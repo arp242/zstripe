@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -36,12 +36,12 @@ type Event struct {
 	Livemode        bool   `json:"livemode"`
 	Created         int64  `json:"created"`
 	Account         string `json:"account"`          // Account that originated the event (Connect only).
-	PendingWebhooks int64  `json:"pending_webhooks"` // Number of webhooks that still eed to be delivered.
+	PendingWebhooks int64  `json:"pending_webhooks"` // Number of webhooks that still need to be delivered.
 
 	Data struct {
 		Raw json.RawMessage `json:"object"`
 
-		// Relavant resource, e.g. "invoice.created" will have the full invoice
+		// Relevant resource, e.g. "invoice.created" will have the full invoice
 		// object.
 		Object map[string]interface{}
 
@@ -50,8 +50,8 @@ type Event struct {
 		PreviousAttributes map[string]interface{} `json:"previous_attributes"`
 	} `json:"data"`
 
-	// Detials about the request that created the event; may be empty as not
-	// all evensts are created by a request.
+	// Details about the request that created the event; may be empty as not all
+	// events are created by a request.
 	Request struct {
 		ID             string `json:"id"`
 		IdempotencyKey string `json:"idempotency_key"`
@@ -60,6 +60,10 @@ type Event struct {
 
 // Read the event from the request body and validate the signature.
 func (e *Event) Read(r *http.Request) error {
+	if SignSecret == "" {
+		panic("zstripe.Event.Read: must set zstripe.SignSecret")
+	}
+
 	ts, sigs, err := parseHeader(r.Header.Get("Stripe-Signature"))
 	if err != nil {
 		return err
@@ -68,8 +72,7 @@ func (e *Event) Read(r *http.Request) error {
 		return ErrWebhookTooOld
 	}
 
-	//b, err := ioutil.ReadAll(http.MaxBytesReader(w, r.Body, 65536))
-	b, err := ioutil.ReadAll(r.Body)
+	b, err := io.ReadAll(r.Body)
 	if err != nil {
 		return err
 	}
@@ -154,6 +157,5 @@ func parseHeader(header string) (time.Time, [][]byte, error) {
 	if len(sigs) == 0 {
 		return ts, nil, ErrWebhookInvalidSignature
 	}
-
 	return ts, sigs, nil
 }
