@@ -1,10 +1,11 @@
-[![GoDoc](https://godoc.org/zgo.at/zstripe?status.svg)](https://pkg.go.dev/zgo.at/zstripe)
-[![Build Status](https://travis-ci.org/zgoat/zstripe.svg?branch=master)](https://travis-ci.org/zgoat/zstripe)
-
 zstripe is a set of utility functions for working with the Stripe API.
 
 It's not a full "client library"; but just a few functions that make it easy
 to call api.stripe.com.
+
+API docs: https://godocs.io/zgo.at/zstripe
+
+---
 
 Personally, I prefer working with the API "directly", instead of using an
 elaborate wrapper/client library. YMMV. Check out
